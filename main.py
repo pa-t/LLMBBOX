@@ -6,7 +6,7 @@ import os
 import random
 from dotenv import load_dotenv
 from openai import OpenAI
-from typing import Optional
+from typing import Optional, Tuple
 from domain.prompts import CLAUDE_BBOX_PROMPT, OBJECT_DETECTION_PROMPT
 from domain.schemas import BoundingBoxes, ModelProvider
 
@@ -17,11 +17,6 @@ CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 
 
 class ObjectDetector:
-    """
-    A unified object detection class that supports both OpenAI and Claude APIs
-    for generating bounding boxes from images.
-    """
-
     def __init__(
         self,
         openai_client: Optional[OpenAI] = None,
@@ -74,8 +69,7 @@ class ObjectDetector:
             raise ValueError("OpenAI client not initialized")
 
         prompt_with_instructions = OBJECT_DETECTION_PROMPT.format(
-            USER_INSTRUCTIONS=user_query
-        )
+            USER_INSTRUCTIONS=user_query)
 
         messages = [
             {
@@ -94,9 +88,7 @@ class ObjectDetector:
         ]
 
         completion = self.openai_client.chat.completions.create(
-            model=self.openai_model, 
-            messages=messages
-        )
+            model=self.openai_model, messages=messages)
 
         if not completion.choices[0].message.content:
             raise ValueError("Expected message content on response was not found")
@@ -130,8 +122,7 @@ class ObjectDetector:
             raise ValueError("Claude client not initialized")
 
         prompt_with_instructions = OBJECT_DETECTION_PROMPT.format(
-            USER_INSTRUCTIONS=user_query
-        )
+            USER_INSTRUCTIONS=user_query)
 
         image_data = self._base64_encode_image(image_path)
         media_type = self._get_image_media_type(image_path)
@@ -164,6 +155,7 @@ class ObjectDetector:
         response_text = message.content[0].text
 
         # Extract JSON from response
+        # how does anthropic still not have structured responses in claude
         try:
             start_idx = response_text.find('{')
             end_idx = response_text.rfind('}') + 1
@@ -194,16 +186,17 @@ class ObjectDetector:
         Args:
             image_path: Path to the image file
             user_query: User's query about objects to detect
-            object_detection_prompt: Template prompt for object detection
             provider: Which API provider to use (OpenAI or Claude)
             
         Returns:
             BoundingBoxes object containing detected objects and their coordinates
         """
         if provider == ModelProvider.OPENAI:
-            return self._generate_bounding_boxes_openai(image_path, user_query)
+            return self._generate_bounding_boxes_openai(
+                image_path=image_path, user_query=user_query)
         elif provider == ModelProvider.CLAUDE:
-            return self._generate_bounding_boxes_claude(image_path, user_query)
+            return self._generate_bounding_boxes_claude(
+                image_path=image_path, user_query=user_query)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -281,7 +274,7 @@ class ObjectDetector:
         user_prompt: str,
         provider: ModelProvider = ModelProvider.OPENAI,
         output_path: Optional[str] = None,
-    ) -> tuple[BoundingBoxes, str]:
+    ) -> Tuple[BoundingBoxes, str]:
         """
         Complete object detection pipeline: generate bounding boxes and display results.
         
@@ -290,18 +283,16 @@ class ObjectDetector:
             user_prompt: User's query about objects to detect
             object_detection_prompt: Template prompt for object detection
             provider: Which API provider to use (OpenAI or Claude)
-            display_method: How to display the image (see draw_bounding_boxes for options)
             output_path: Path to save the output image
             
         Returns:
             Tuple of (BoundingBoxes object, output_image_path)
         """
         bounding_boxes = self.generate_bounding_boxes(
-            image_path=image_path, user_query=user_prompt, provider=provider
-        )
+            image_path=image_path, user_query=user_prompt, provider=provider)
         output_image_path = self.draw_bounding_boxes(
-            image_path=image_path, bounding_boxes=bounding_boxes, output_path=output_path
-        )
+            image_path=image_path, bounding_boxes=bounding_boxes,
+            output_path=output_path)
         return bounding_boxes, output_image_path
 
 
@@ -311,8 +302,7 @@ if __name__ == "__main__":
 
     detector = ObjectDetector(
         openai_client=openai_client,
-        claude_client=claude_client
-    )
+        claude_client=claude_client)
 
     try:
         results_openai, output_path = detector.detect_objects(
